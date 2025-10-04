@@ -1,0 +1,130 @@
+# =========================
+# Analytica Kepler (.gitignore)
+# Projeto: Python + Jupyter + (futuro) Streamlit
+# =========================
+
+# --- Python build / cache ---
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
+*.spec
+
+# --- Virtual envs ---
+.venv/
+venv/
+env/
+ENV/
+.conda/
+.venv*/
+
+# --- Dependências e cache de pacotes ---
+*.lock
+.poetry/
+.pyenv/
+pip-cache/
+pip_cache/
+.pip/
+.cache/
+.mypy_cache/
+.pytype/
+.pyre/
+.pytest_cache/
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+*.ipynb_convert*
+*.nbconvert.ipynb
+profile_default/
+.ipython/
+
+# --- Dados e artefatos grandes (mantenha só exemplos pequenos) ---
+data/**
+!data/.gitkeep
+datasets/**
+!datasets/.gitkeep
+raw_data/**
+!raw_data/.gitkeep
+outputs/**
+!outputs/.gitkeep
+figures/**
+!figures/.gitkeep
+tmp/
+temp/
+
+# Arquivos científicos e raster pesados (geralmente baixados/derivados)
+*.fits
+*.fits.gz
+*.hdf
+*.h5
+*.tif
+*.tiff
+*.jp2
+*.parquet
+*.feather
+*.arrow
+*.csv.gz
+*.zip
+*.7z
+
+# --- Modelos/Checkpoints ---
+models/**
+!models/.gitkeep
+checkpoints/**
+!checkpoints/.gitkeep
+*.pkl
+*.joblib
+*.ckpt
+*.pth
+*.h5
+
+# --- Logs e relatórios temporários ---
+logs/**
+!logs/.gitkeep
+*.log
+wandb/
+mlruns/
+
+# --- Streamlit / Segredos ---
+.streamlit/secrets.toml
+.streamlit/state.json
+
+# --- Config/Segredos locais ---
+.env
+.env.*
+*.secret
+secrets/
+*.key
+*.pem
+
+# --- IDE/Editor ---
+.vscode/
+.idea/
+*.code-workspace
+.history/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# --- Node (se criar front depois) ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-store/
+
+# --- Testes/Cobertura ---
+.tox/
+.nox/
+.coverage
+coverage.xml
+htmlcov/
