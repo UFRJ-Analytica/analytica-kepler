@@ -47,7 +47,7 @@ profile_default/
 # --- Dados e artefatos grandes (mantenha só exemplos pequenos) ---
 data/**
 !data/.gitkeep
-datasets/**
+
 !datasets/.gitkeep
 raw_data/**
 !raw_data/.gitkeep
@@ -78,7 +78,7 @@ models/**
 !models/.gitkeep
 checkpoints/**
 !checkpoints/.gitkeep
-*.pkl
+
 *.joblib
 *.ckpt
 *.pth
