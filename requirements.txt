@@ -22,4 +22,6 @@ jupyter>=1.0
 # pyproj>=3.6
 
 # ===== Web UI (opcional; para o deploy futuro) =====
-# streamlit>=1.36
+streamlit
+google-generativeai
+python-dotenv
