@@ -5,24 +5,17 @@
     "nixpacks": {
       "phases": {
         "install": {
-          "nixPkgs": [
-            "opencv",
-            "streamlit",            
-            "google-generativeai"
-          ],
-          "pythonDependencies": [
-            "streamlit",            
-            "google-generativeai"
-          ],
           "commands": [
-            "pip install -e .",
-            "cd my_component/frontend &&  && npm run build"
+            "pip install --upgrade pip",
+            "pip install -r requirements.txt"
           ]
         }
       }
     }
   },
   "deploy": {
-    "startCommand": "streamlit run app.py --server.address 0.0.0.0 --server.port $PORT --server.fileWatcherType none --browser.gatherUsageStats false --client.toolbarMode minimal"
+    "startCommand": "streamlit run app.py --server.address 0.0.0.0 --server.port $PORT --server.headless true --server.fileWatcherType none --browser.gatherUsageStats false --client.toolbarMode minimal",
+    "numReplicas": 1,
+    "healthcheckPath": "/"
   }
 }
