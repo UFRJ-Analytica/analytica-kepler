@@ -23,3 +23,5 @@ jupyter>=1.0
 
 # ===== Web UI (opcional; para o deploy futuro) =====
 streamlit
+google-generativeai
+python-dotenv
