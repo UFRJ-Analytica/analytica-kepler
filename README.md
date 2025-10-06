@@ -1,159 +1,97 @@
-# Analytica Kepler — Caçando Exoplanetas com IA
-
-**Time:** Analytica Kepler (UFRJ Analytica)  
-**Desafio:** NASA Space Apps 2025 — *Um mundo distante: caçando exoplanetas com IA*  
-**Stack:** Python • Jupyter • (futuro) Streamlit
-
-> Nosso objetivo é treinar modelos de IA/ML com dados abertos (Kepler/K2/TESS) e analisar **novos dados** (incluindo NEOSSat) para **priorizar/identificar** exoplanetas, com uma interface simples para pesquisadores e curiosos.
+Here’s a clean **README.md in English** you can paste into your repo:
 
 ---
 
-## 🚀 O que este repositório entrega
+# Analytica Kepler — Hunting Exoplanets with AI
 
-- **Notebook starter comentado (PT‑BR)** com pipeline de ponta a ponta:
-  - Download de **FITS do NEOSSat** e inspeção rápida
-  - Curva de luz *toy* (aperture sum) para validar o fluxo
-  - Ingestão de **KOI/TOI** via **NASA Exoplanet Archive (TAP)**
-  - **Baseline ML** com `RandomForest` para classificar `koi_disposition`
-  - **Feature `mission`** (Kepler/TESS; pronto para NEOSSat como domínio novo)
-- Estrutura de pastas preparada (com `.gitkeep`) para dados, modelos e saídas
-- Checklist de próximos passos (fotometria, features de trânsito, UI Streamlit, deploy)
+**Team:** Analytica Kepler (UFRJ Analytica)
+**Challenge:** NASA Space Apps 2025 — *A Distant World: Hunting Exoplanets with AI*
+**Stack:** Python • Jupyter • Streamlit
 
-> **Classificação que fazemos aqui**: dado um conjunto de **atributos/tabulares** (ex.: período, duração, profundidade do trânsito, raio planetário/estelar…), o modelo aprende a prever a **disposição** do objeto — `CONFIRMED`, `CANDIDATE`, `FALSE POSITIVE`. Isso **triagem**/prioriza os melhores alvos e reduz esforço manual, alinhado ao que o desafio pede.
+> We train ML/AI models on open data (Kepler/K2/TESS) and analyze **new datasets** (including K2/NEOSSat) to **prioritize/identify** exoplanet candidates. The web app supports CSV upload, automatic harmonization (via an Agent), and probability-based predictions.
 
 ---
 
-## 📁 Estrutura
+## 🔗 Production Demo
+
+* **App (Streamlit):** *<insert Railway URL>*
+* **Loaded model:** `models/harmonized_rf_model.pkl`
+
+---
+
+## 🚀 What this repository provides
+
+* **Commented notebook (PT-BR)** covering the pipeline:
+
+  * Sample **NEOSSat FITS** download/inspection
+  * Toy light curve (aperture-sum)
+  * **KOI/TOI** ingestion via **NASA Exoplanet Archive (TAP)**
+  * **Baseline ML** (Random Forest) for `koi_disposition`
+  * **`mission` feature** (Kepler/TESS) for cross-mission robustness
+* **Training script** (`src/train.py`): harmonizes KOI/TOI, maps TOI labels, trains, and saves `.pkl`
+* **Agent** (`src/agent.py`) that:
+
+  * Detects format (KOI/TOI) or uses **Gemini** to suggest mappings for unfamiliar datasets
+  * Harmonizes input and applies the **model** (uses `predict_proba` and provides **insights**)
+* **Streamlit app** (`app.py`) for upload → harmonization → prediction dashboard
+
+> **Task:** from **tabular transit features** (period, duration, depth, radii), the model predicts **CONFIRMED** vs **FALSE POSITIVE** (binary baseline). “CANDIDATE/APC” are excluded from training and may appear as ambiguous during analysis.
+
+---
+
+## 📁 Repository structure
 
 ```
 .
-├─ data/               # dados locais (não versionados)  ← .gitignore
-├─ datasets/           # exemplos pequenos para teste     ← .gitignore
-├─ models/             # artefatos .pkl                   ← .gitignore
-├─ outputs/            # relatórios/figuras               ← .gitignore
-├─ figures/            # imagens geradas                  ← .gitignore
-├─ logs/               # logs                             ← .gitignore
+├─ data/               # local data (not versioned)
+├─ datasets/           # small examples for testing
+├─ models/             # .pkl artifacts
+├─ outputs/            # reports/figures
+├─ figures/            # generated images
+├─ logs/               # logs
 ├─ notebooks/
-│  └─ AnalyticaKepler_Exoplanets_Starter_UPDATED.ipynb
+│  └─ AnalyticaKepler_Exoplanets_Starter.ipynb
+├─ src/
+│  ├─ train.py
+│  ├─ agent.py
+│  └─ parsers.py
+├─ app.py
+├─ requirements.txt
+├─ railway.json
 └─ README.md
 ```
 
-> Observação: grandes arquivos (FITS, HDF, CSVs comprimidos, modelos) estão no `.gitignore`. Mantenha somente amostras pequenas em `datasets/`.
+> Large files (FITS, models) are ignored via `.gitignore`, except `models/harmonized_rf_model.pkl`.
 
 ---
 
-## ⚙️ Instalação rápida
+## ⚙️ Quickstart
 
 ```bash
-# Recomendado: criar venv
+# create venv
 python -m venv .venv
-source .venv/bin/activate   # (Windows: .venv\Scripts\activate)
 
-# Dependências essenciais
-pip install numpy pandas matplotlib requests beautifulsoup4 astropy scikit-learn jupyter
+# PowerShell (Windows)
+.\.venv\Scripts\Activate.ps1
+# Linux/macOS
+source .venv/bin/activate
 
-# (Opcional para fotometria/curvas): photutils, lightkurve, pyvo
-# pip install photutils lightkurve pyvo
+# install deps
+pip install -r requirements.txt
+
+# run locally
+streamlit run app.py
 ```
 
 ---
 
-## 🧪 Notebook principal
+## 🧪 Main notebook
 
-1. Abra o Jupyter:
-   ```bash
-   jupyter notebook
-   ```
-2. Execute o notebook:
-   - `notebooks/AnalyticaKepler_Exoplanets_Starter_UPDATED.ipynb`
+1. **NEOSSat (CSA):** list/download sample **FITS**, show header & image.
+2. **Toy light curve:** simple aperture-sum with background subtraction (illustrative).
+3. **KOI/TOI (TAP):** HTTP (CSV). **TOI tip** — use `AS` aliases:
 
-### Conteúdo do notebook
-
-1) **NEOSSat (CSA)**  
-   - Lista e baixa alguns **FITS** (amostra) do repositório público.  
-   - Inspeção do cabeçalho e renderização da imagem para verificação.
-
-2) **Curva de luz *toy***  
-   - *Aperture sum* ao redor do pixel mais brilhante (com subtração de fundo).  
-   - Ilustra o fluxo **FITS → métrica de fluxo** (não é fotometria científica).
-
-3) **KOI/TOI via TAP** (NASA Exoplanet Archive)  
-   - Carrega tabelas **KOI** (Kepler) e **TOI** (TESS) por HTTP (CSV).  
-   - **Dica TOI:** use `AS` para nomes “amigáveis” e evitar erros 400 (colunas válidas):
-     ```sql
-     select top 500
-       toi,
-       tid as tic_id,
-       tfopwg_disp,
-       pl_orbper  as orbital_period,
-       pl_trandep as transit_depth,
-       pl_trandurh as transit_duration,
-       pl_rade    as planet_radius,
-       st_rad     as stellar_radius,
-       st_teff    as stellar_teff
-     from toi
-     ```
-
-4) **Baseline ML**  
-   - Treina `RandomForest` para **`koi_disposition`** com features:  
-     `koi_period, koi_duration, koi_depth, koi_prad, koi_impact, koi_srad, koi_smass`  
-   - **Inclui `mission`** (`Kepler`, `TESS`) via *one‑hot*.  
-   - Mostra **acurácia**, **classification_report** e **importância de features**.
-
-5) **Exporta modelo**  
-   - Salva em `models/koi_rf_with_mission.pkl`.
-
----
-
-## 🧩 Como isso atende ao desafio
-
-- **Treino supervisionado** usando rótulos oficiais (KOI/TOI);
-- **Generalização entre missões** (feature `mission` e, futuramente, *domain adaptation*);
-- **Análise de novos dados**: pipeline para gerar *features* de **NEOSSat** (FITS → LC/estatísticas → predição);
-- **Interface web** (próximo passo): Streamlit para upload de dados, ajuste de hiperparâmetros e visualização de métricas.
-
-> **Rotulagem TOI (harmonização)**: mapeie `tfopwg_disp` para as classes do Kepler, p.ex. `CP/KP → CONFIRMED`, `PC → CANDIDATE`, `FP/FA → FALSE POSITIVE`, `APC → AMBIG` (tratar à parte).
-
----
-
-## 🧱 Próximos passos (backlog)
-
-- **Fotometria**: `photutils` (aperture/PSF), alinhamento entre frames, *flags* de qualidade.
-- **Features de trânsito**: profundidade/duração refinadas, odd/even, SNR, ajuste trapezoidal.
-- **Validação**: PR‑AUC por classe, curvas de calibração, *cross‑mission split* (treina Kepler → testa TESS).
-- **Domain adaptation**: `mission` + metadados de cabeçalho (NEOSSat) como *features* de robustez.
-- **Streamlit (Railway)**: upload de CSV/LC, batch scoring, gráficos (LC dobrada, importância, PR‑curves).
-
----
-
-## 🔗 Fontes de dados e documentação
-
-- **NASA Exoplanet Archive (TAP)**  
-  - Documentação TAP: https://exoplanetarchive.ipac.caltech.edu/docs/TAP/usingTAP.html  
-  - Colunas **KOI (cumulative)**: https://exoplanetarchive.ipac.caltech.edu/docs/API_kepcandidate_columns.html  
-  - Colunas **TOI**: https://exoplanetarchive.ipac.caltech.edu/docs/API_TOI_columns.html  
-
-- **NEOSSat — Agência Espacial Canadense (CSA)**  
-  - Dataset aberto (FITS, árvore por ano): https://donnees-data.asc-csa.gc.ca/en/dataset/9ae3e718-8b6d-40b7-8aa4-858f00e84b30  
-  - Página NEOSSat: https://www.asc-csa.gc.ca/eng/satellites/neossat/  
-  - CADC (NEOSSat): https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/neossat/  
-  - Guia FITS NEOSSat (PDF): (ver pasta de documentos no portal Open Data)
-
-- **JWST (contexto e follow‑up científico)**  
-  - Informações: https://www.asc-csa.gc.ca/eng/satellites/jwst/about.asp
-
-> **Observação de licença**: dados do NEOSSat seguem **Open Government Licence – Canada (OGL‑Canada)**. Cite as fontes (CSA/CADC, NASA Exoplanet Archive) ao publicar resultados/derivados.
-
----
-
-## ▶️ Exemplo mínimo (TOI com alias)
-
-```python
-from urllib.parse import quote_plus
-import pandas as pd
-
-TAP_BASE = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
-q = "
+```sql
 select top 500
   toi,
   tid as tic_id,
@@ -165,31 +103,111 @@ select top 500
   st_rad     as stellar_radius,
   st_teff    as stellar_teff
 from toi
-"
-url = f"{TAP_BASE}?query={quote_plus(' '.join(q.split()))}&format=csv"
-toi_df = pd.read_csv(url)
-toi_df.head()
 ```
 
----
-
-## 🤝 Contribuição
-
-- Issues e PRs são bem-vindos.  
-- Use notebooks claros, células curtas e comentários em PT‑BR/EN.  
-- Evite subir arquivos grandes (FITS, modelos) — utilize *releases* ou *data links*.
+4. **Baseline ML:** RandomForest + `mission`.
+5. **Model export:** `models/koi_rf_with_mission.pkl` (notebook) and `models/harmonized_rf_model.pkl` (script).
 
 ---
 
-## 📜 Agradecimentos
+## 🧩 How we meet the challenge
 
-- **NASA Space Apps**, **NASA Exoplanet Archive**  
-- **Agência Espacial Canadense (CSA)** pelo **NEOSSat** e dados abertos  
-- Comunidade open‑source (Astropy, scikit‑learn, etc.)
+* **Supervised training** (KOI/TOI) with official labels.
+* **Cross-mission generalization** (Kepler/TESS; K2 handled via the Agent).
+* **New data analysis:** upload → auto-harmonize → predict with **probabilities**.
+* **Web interface:** Streamlit with metrics and CSV download.
+
+> **TOI label mapping:** `CP/KP → CONFIRMED`, `FP/FA → FALSE POSITIVE`, `PC/APC → ambiguous or excluded from binary baseline`.
+> **Units:** `koi_depth` in ppm → converted to fraction (`ppm/10000`).
 
 ---
 
-## 📣 Contato
+## 📊 Performance metrics
 
-- **Equipe:** Analytica Kepler — UFRJ Analytica  
-- **Objetivo:** acelerar a descoberta e priorização de exoplanetas com ferramentas abertas e acessíveis.
+* **Accuracy** (70/30 stratified, ~87%).
+* **Confusion matrix** (CONFIRMED vs FALSE POSITIVE).
+* **PR-AUC (CONFIRMED)** — more informative with class imbalance.
+
+> Training saves `figures/confusion_matrix.png` and `figures/pr_curve_confirmed.png`. The app includes a **Metrics** section.
+
+---
+
+## 🧪 UI: hyperparameters & (re)training (near-term roadmap)
+
+* **Hyperparam panel** (n_estimators, max_depth, class_weight)
+* **Retrain with CSV** (optional):
+
+  * user supplies **label column**
+  * Agent suggests mapping → validate → (re)train and save user model
+* **Adjustable threshold** for “CONFIRMED” (default 0.7)
+* **CSV download** with predictions and probabilities
+
+---
+
+## 🛰️ K2 example (generalization)
+
+A tiny K2 CSV sample is included in `datasets/`. The Agent harmonizes it and applies the model.
+
+> Next: `parse_k2_data` (if needed) for an explicit schema.
+
+---
+
+## 🧱 Deploy (Railway)
+
+* `railway.json` installs `requirements.txt` and runs `app.py` with `$PORT`.
+* Environment variables:
+
+  * `GOOGLE_API_KEY` (Gemini) — optional; only for AI mapping assistance.
+
+---
+
+## 🗣️ Pitch (1 slide)
+
+**Problem:** manual vetting of transit candidates is time-consuming.
+**Solution:** probability-based triage with an Agent that harmonizes new datasets.
+**Data:** KOI/TOI (NASA), K2/NEOSSat (examples).
+**Demo:** upload → harmonize → predict + PR-AUC/confusion matrix.
+**Impact:** faster follow-up; less manual load.
+**Roadmap:** robust NEOSSat photometry, domain adaptation, in-app retraining.
+
+---
+
+## 🔗 Data sources & docs
+
+* **NASA Exoplanet Archive (TAP)**
+
+  * Using TAP: [https://exoplanetarchive.ipac.caltech.edu/docs/TAP/usingTAP.html](https://exoplanetarchive.ipac.caltech.edu/docs/TAP/usingTAP.html)
+  * KOI columns: [https://exoplanetarchive.ipac.caltech.edu/docs/API_kepcandidate_columns.html](https://exoplanetarchive.ipac.caltech.edu/docs/API_kepcandidate_columns.html)
+  * TOI columns: [https://exoplanetarchive.ipac.caltech.edu/docs/API_TOI_columns.html](https://exoplanetarchive.ipac.caltech.edu/docs/API_TOI_columns.html)
+
+* **NEOSSat — Canadian Space Agency (CSA)**
+
+  * Open dataset: [https://donnees-data.asc-csa.gc.ca/en/dataset/9ae3e718-8b6d-40b7-8aa4-858f00e84b30](https://donnees-data.asc-csa.gc.ca/en/dataset/9ae3e718-8b6d-40b7-8aa4-858f00e84b30)
+  * NEOSSat page: [https://www.asc-csa.gc.ca/eng/satellites/neossat/](https://www.asc-csa.gc.ca/eng/satellites/neossat/)
+  * CADC NEOSSat: [https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/neossat/](https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/neossat/)
+
+> **License:** NEOSSat data under **Open Government Licence – Canada (OGL-Canada)**. Cite CSA/CADC and NASA Exoplanet Archive.
+
+---
+
+## 🤝 Contributing
+
+* PRs and issues are welcome.
+* Keep notebooks clear (PT-BR/EN comments), and provide small samples in `datasets/`.
+* Avoid pushing large files (FITS/models) — use LFS or external links.
+
+---
+
+## 📜 Acknowledgments
+
+* **NASA Space Apps**, **NASA Exoplanet Archive**
+* **CSA** (NEOSSat) and the **open-source community** (Astropy, scikit-learn)
+
+---
+
+## 📣 Contact
+
+* **Team:** Analytica Kepler — UFRJ Analytica
+* **Goal:** accelerate exoplanet discovery and prioritization with open, accessible tools.
+
+---
