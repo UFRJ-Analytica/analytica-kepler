@@ -1,111 +1,170 @@
-# Em: src/agent.py
+# Em: src/agent.py (Versão Final Sincronizada)
 
 import pandas as pd
 import joblib
 import os
+import sys
 import json
+import re
 import google.generativeai as genai
 from dotenv import load_dotenv
-from src.parsers import parse_koi_data, parse_toi_data
 
-# Carrega as variáveis de ambiente (sua API key) do arquivo .env
+# --- Bloco de Importação Robusto ---
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
+
+from processing import preprocess_and_engineer_features
+
 load_dotenv()
 
 class ExoHunterAgent:
-    def __init__(self, model_path="models/harmonized_rf_model.pkl"):
-        self.model = self._load_model(model_path)
-        self.parsers = {
-            'koi': parse_koi_data,
-            'toi': parse_toi_data
+    def __init__(self, model_path="models/robust_generalist_model.pkl"):
+        print("--- AGENT (Final): Iniciando __init__. ---")
+        self.target_schema = {
+            'orbital_period': 'O período orbital do planeta em dias.',
+            'transit_duration': 'A duração do trânsito em horas.',
+            'transit_depth': 'A profundidade do trânsito (a fração da luz estelar bloqueada).',
+            'planet_radius': 'O raio do planeta em unidades de raios terrestres.',
+            'stellar_radius': 'O raio da estrela em unidades de raios solares.',
+            'impact_parameter': 'O parâmetro de impacto do trânsito (quão central é a passagem).',
+            'stellar_gravity': 'A gravidade na superfície da estrela (log(g)), usada para calcular a densidade.'
         }
-        # Configura a API do Gemini
+        
+        artifact = self._load_artifact(model_path)
+        if artifact:
+            self.model = artifact['model']
+            self.imputer = artifact['imputer']
+            self.model_features = artifact['features']
+            self.model_accuracy = artifact.get('accuracy', 0.0)
+            print(f"--- AGENT (Final): Artefacto OK, {len(self.model_features)} features. ---")
+        else:
+            self.model, self.imputer, self.model_features, self.model_accuracy = None, None, list(self.target_schema.keys()), 0.0
+
         try:
             genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
-            self.genai_model = genai.GenerativeModel('gemini-pro-latest')
+            self.genai_model = genai.GenerativeModel('gemini-1.0-pro')
+            print("--- AGENT (Final): Gemini OK. ---")
         except Exception as e:
-            print(f"AVISO: Não foi possível configurar a API do Gemini. A análise por IA estará desabilitada. Erro: {e}")
             self.genai_model = None
+            print(f"--- AVISO AGENT (Final): Gemini falhou: {e} ---")
 
-    def _load_model(self, path):
-        # ... (código igual ao anterior) ...
+    def _load_artifact(self, path):
         try:
             return joblib.load(path)
         except FileNotFoundError:
-            print(f"ERRO: Modelo não encontrado em '{path}'")
+            print(f"--- ERRO AGENT (Final): Modelo '{path}' não encontrado. ---")
             return None
 
-    def _identify_format_robust(self, df: pd.DataFrame) -> str:
-        # ... (código da função de identificação robusta que já fizemos) ...
-        columns = set(df.columns.str.lower())
-        koi_fingerprint = {'kepid', 'koi_period', 'koi_depth'}
-        if koi_fingerprint.issubset(columns): return 'koi'
-        toi_fingerprint = {'tid', 'pl_orbper', 'pl_trandep'}
-        if toi_fingerprint.issubset(columns): return 'toi'
-        if 'koi_disposition' in columns: return 'koi'
-        if 'tfopwg_disp' in columns: return 'toi'
-        return 'unknown'
+    def suggest_disposition_column(self, available_columns: list) -> str | None:
+        """Encontra a coluna de resultado ('disposition') de forma determinística e rápida."""
+        print("--- AGENT (Final): Procurando pela coluna de resultado... ---")
+        for col in available_columns:
+            col_lower = col.lower()
+            if 'disposition' in col_lower or 'disp' in col_lower:
+                print(f"--- AGENT (Final): Coluna de resultado encontrada: {col} ---")
+                return col
+        return None
 
-    def get_ai_suggested_mapping(self, df_columns: list) -> dict:
-        """Usa a API do Gemini para sugerir um mapeamento de colunas."""
-        if not self.genai_model:
-            return {}
-
-        standard_schema_str = "['orbital_period', 'transit_duration', 'transit_depth', 'planet_radius', 'stellar_radius']"
-        
-        prompt = f"""
-        Contexto: Você é um subsistema de IA especialista em dados astronômicos para o agente ExoHunter.
-        Sua tarefa é mapear as colunas de um novo dataset de exoplanetas para um esquema padrão.
-        
-        Esquema Padrão (nomes que eu entendo): 
-        {standard_schema_str}
-
-        Colunas do Novo Dataset (nomes que eu não conheço): 
-        {df_columns}
-        
-        Tarefa: Analise as 'Colunas do Novo Dataset' e retorne um objeto JSON que mapeia os nomes desconhecidos para os nomes do 'Esquema Padrão'. 
-        O JSON deve ter a chave 'column_mappings' e o valor deve ser um dicionário.
-        Exemplo de saída: {{"column_mappings": {{"koi_period": "orbital_period", "koi_depth": "transit_depth"}}}}
-        Inclua apenas os mapeamentos dos quais você tem alta confiança.
+    def suggest_feature_mapping(self, available_columns: list, column_descriptions: dict, df_sample: pd.DataFrame = None, use_gemini: bool = True, find_disposition_col: bool = False) -> dict:
         """
+        Motor de mapeamento unificado e otimizado. Usa um estágio determinístico rápido e,
+        opcionalmente, um estágio de IA para preencher as lacunas.
+        """
+        print("\n--- AGENT (Final): Iniciando Motor de Mapeamento Unificado. ---")
+        
+        # --- Estágio 1: Determinístico (Rápido) ---
+        print("--- AGENT (Final): Estágio 1 - Determinístico. ---")
+        suggested_map = {}
+        common_name_map = {
+            'pl_orbper': 'orbital_period', 'koi_period': 'orbital_period',
+            'pl_trandurh': 'transit_duration', 'koi_duration': 'transit_duration', 'pl_trandur': 'transit_duration',
+            'pl_trandep': 'transit_depth', 'koi_depth': 'transit_depth',
+            'pl_rade': 'planet_radius', 'koi_prad': 'planet_radius',
+            'st_rad': 'stellar_radius', 'koi_srad': 'stellar_radius',
+            'pl_imppar': 'impact_parameter', 'koi_impact': 'impact_parameter',
+            'st_logg': 'stellar_gravity', 'koi_slogg': 'stellar_gravity'
+        }
+        for orig_col in available_columns:
+            col_lower = orig_col.lower()
+            if col_lower in common_name_map:
+                target = common_name_map[col_lower]
+                if target not in suggested_map.values():
+                    suggested_map[orig_col] = target
+        
+        print(f"--- AGENT (Final): Estágio 1: {len(suggested_map)}/{len(self.target_schema)} mapeadas.")
+
+        # --- Estágio 2: Gemini Otimizado (Opcional) ---
+        features_to_find = {k:v for k, v in self.target_schema.items() if k not in suggested_map.values()}
+        
+        if use_gemini and column_descriptions and features_to_find and self.genai_model:
+            print("--- AGENT (Final): Estágio 2 - Gemini Otimizado. ---")
+            available_cols_with_desc = {k: v for k, v in column_descriptions.items() if k not in suggested_map.keys()}
+            
+            prompt = f"""
+            Você é um especialista em astrofísica. Faça um "match" semântico entre as features que eu preciso (NEEDED) e as colunas disponíveis, usando APENAS as suas descrições oficiais.
+            Features NEEDED: {json.dumps(features_to_find, indent=2)}
+            Colunas disponíveis (com descrições): {json.dumps(available_cols_with_desc, indent=2)}
+            Output EXATO: JSON com a chave "column_mappings". Exemplo: {{"pl_trandur": "transit_duration"}}
+            """
+            try:
+                response = self.genai_model.generate_content(prompt)
+                cleaned = response.text.strip()
+                json_match = re.search(r'\{.*\}', cleaned, re.DOTALL)
+                if json_match:
+                    ai_map = json.loads(json_match.group()).get("column_mappings", {})
+                    for col, feature in ai_map.items():
+                        original_cased_col = next((c for c in available_columns if c.lower() == col.lower()), None)
+                        if original_cased_col and feature in features_to_find:
+                            suggested_map[original_cased_col] = feature
+                    print(f"--- AGENT (Final): Estágio 2: +{len(ai_map)} mapeamentos. Total: {len(suggested_map)}.")
+            except Exception as e:
+                print(f"--- AVISO AGENT (Final): Gemini parse falhou: {e}. ---")
+
+        # --- Lógica Adicional para Treino ---
+        if find_disposition_col:
+            disposition_col = self.suggest_disposition_column(available_columns)
+            if disposition_col:
+                suggested_map[disposition_col] = 'resultado'
+
+        print(f"--- AGENT (Final): Mapeamento final: {suggested_map} ---")
+        return suggested_map
+
+    def harmonize_and_prepare_data(self, df: pd.DataFrame, user_validated_mapping: dict) -> pd.DataFrame:
+        """Harmoniza e prepara os dados para o modelo."""
+        print("--- AGENT (Final): Harmonizando dados. ---")
+        df_renamed = df.rename(columns=user_validated_mapping)
+        df_processed = preprocess_and_engineer_features(df_renamed)
+        
+        # Reindexar para garantir que todas as features do modelo estão presentes
+        X_final_schema = df_processed.reindex(columns=self.model_features)
+        
+        # Imputar os dados em falta
+        X_imputed = self.imputer.transform(X_final_schema)
+        
+        # Retornar um DataFrame com os dados preparados e nomes de colunas corretos
+        prepared_df = pd.DataFrame(X_imputed, columns=self.model_features)
+        return prepared_df
+
+    def classify_candidates(self, prepared_df: pd.DataFrame) -> pd.DataFrame:
+        """Executa a classificação nos dados preparados."""
+        print(f"--- AGENT (Final): Classificando {len(prepared_df)} candidatos. ---")
+        if not self.model:
+            raise ValueError("Modelo não carregado!")
+        
+        predictions = self.model.predict(prepared_df)
+        probabilities = self.model.predict_proba(prepared_df)
+        class_map = self.model.classes_.tolist()
         
         try:
-            response = self.genai_model.generate_content(prompt)
-            # Limpeza básica da resposta para extrair o JSON
-            cleaned_response = response.text.strip().replace("```json", "").replace("```", "")
-            return json.loads(cleaned_response).get("column_mappings", {})
-        except Exception as e:
-            print(f"Erro ao chamar a API do Gemini ou ao processar a resposta: {e}")
-            return {}
-
-    def apply_custom_mapping(self, df: pd.DataFrame, custom_mapping: dict) -> pd.DataFrame:
-        """Aplica um mapeamento fornecido pelo usuário para harmonizar o DataFrame."""
-        harmonized_df = df.rename(columns=custom_mapping)
-
-        # Lógica de conversão de unidades pode ser adicionada aqui se necessário
-        # Ex: if 'transit_depth' in harmonized_df.columns: ...
-
-        # Garante a presença e ordem correta das colunas para o modelo
-        if self.model:
-            model_features = self.model.feature_names_in_
-            if 'mission_TESS' not in harmonized_df.columns:
-                 # Por padrão, assumimos que dados desconhecidos se assemelham mais ao TESS
-                 harmonized_df['mission_TESS'] = 1 
-            harmonized_df = harmonized_df.reindex(columns=model_features)
-
-        return harmonized_df
-
-
-    def analyze_candidate(self, harmonized_df: pd.DataFrame) -> dict:
-        # ... (código igual ao anterior, sem alterações) ...
-        if self.model is None:
-            raise ConnectionError("Modelo de Machine Learning não foi carregado.")
-        prediction = self.model.predict(harmonized_df)[0]
-        probabilities = self.model.predict_proba(harmonized_df)[0]
-        class_map = self.model.classes_.tolist()
-        prob_confirmed = probabilities[class_map.index('CONFIRMED')]
-        insight = ""
-        if prob_confirmed > 0.90: insight = "Candidato de Alta Prioridade..."
-        elif prob_confirmed > 0.70: insight = "Candidato Promissor..."
-        elif 0.40 <= prob_confirmed <= 0.60: insight = "⚠️ Alerta de Ambiguidade..."
-        else: insight = "Provável Falso Positivo..."
-        return { "prediction": prediction, "confidence": prob_confirmed if prediction == 'CONFIRMED' else (1 - prob_confirmed), "insight": insight }
+            prob_idx = class_map.index('CONFIRMED')
+            prob_confirmed = probabilities[:, prob_idx]
+        except ValueError:
+            prob_confirmed = [0.0] * len(prepared_df)
+        
+        results_df = pd.DataFrame(index=prepared_df.index)
+        results_df['prediction'] = predictions
+        results_df['probability_confirmed'] = prob_confirmed
+        
+        print("--- AGENT (Final): Classificação OK. ---")
+        return results_df
