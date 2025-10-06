@@ -1,8 +1,8 @@
-Here’s a clean **README.md in English** you can paste into your repo:
 
----
 
 # Analytica Kepler — Hunting Exoplanets with AI
+
+[![YouTube](https://img.shields.io/badge/Watch%20Demo-YouTube-red)](https://www.youtube.com/watch?v=e_QeQttYwfk)
 
 **Team:** Analytica Kepler (UFRJ Analytica)
 **Challenge:** NASA Space Apps 2025 — *A Distant World: Hunting Exoplanets with AI*
